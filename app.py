@@ -13,6 +13,8 @@ import tdvmc.mathematica_to_sympy as m2s
 # app = dash.Dash(external_stylesheets=[dbc.themes.BOOTSTRAP])
 app = dash.Dash(__name__,external_stylesheets=[dbc.themes.BOOTSTRAP])
 
+server = app.server
+
 def tree(): return defaultdict(tree)
 
 config = tree()
@@ -270,7 +272,6 @@ config_tdvm = {"fails": False}
 app.layout =  dbc.Container(
     html.Div(
         [
-            dbc.Alert("Hello Bootstrap!", color="success"),
             html.H2("Variational Montecarlo Equations"),
             dbc.Card(
                 [
