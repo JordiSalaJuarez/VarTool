@@ -5,3 +5,4 @@ numba
 dash
 dash-bootstrap-components
 gunicorn
+dash_katex
