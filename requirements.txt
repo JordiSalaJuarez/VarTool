@@ -2,7 +2,6 @@ sympy
 lark-parser
 numpy
 numba
-yaml
 dash
 dash-bootstrap-components
 gunicorn
