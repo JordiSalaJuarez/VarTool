@@ -314,24 +314,6 @@ app.layout =  dbc.Container(
     className="p-5",
 )
 
-# app.layout =  dbc.Container(
-#     html.Div([
-#         dbc.Input(id="input"),
-#          dbc.ListGroup(id="test"
-#         )
-#     ]
-#     )
-#     )
-
-# @app.callback(
-#     Output("test", "children"),
-#     [Input("input", "value")]
-# )
-# def foo(text):
-#     if text:
-#         return list(map( dbc.ListGroupItem, text.split(",")))
-#     else:
-#         return ""
 
 if __name__ == "__main__":
     app.run_server(debug=True)
