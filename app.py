@@ -317,17 +317,100 @@ card_operators = dbc.Card(
 )
 
 controls_tdmb = dbc.Card(
+from functools import lru_cache
+
+@lru_cache
+def parser_nested_expr():
+    from pyparsing import Forward, Word, alphas, nestedExpr, pyparsing_common, Suppress
+    enclosed = Forward()
+    nested_brackets = nestedExpr("{", "}", content=enclosed)
+    enclosed << (pyparsing_common.real | pyparsing_common.integer | Suppress(",") | nested_brackets)
+    return lambda expr: enclosed.parseString(expr).asList()[0]
+
+def parse_nested_expr(expr):
+    parser = parser_nested_expr()
+    return parser(expr)
+@app.callback(Output("value.Dt","data"), 
+              [Input("Dh-value","value")],
+              [State("value.Dtm", "data")])
+def assign_Dh(Dh, data_dh):
+    data_dh["value"] = Dh
+    data_dh["state"] = "success"
+    return data_dh
+
+@app.callback(Output("value.Dt", "data"), 
+              [Input("Dt-value","value")],
+              [State("value.Dt", "data")])
+def assign_Dt(Dt, data_dt):
+    data_dt["value"] = Dt
+    data_dh["state"] = "success"
+    return data_dt
+
+@app.callback(Output("value.n_it","data"), 
+              [Input("it-value","value")],
+              [State("value.n_it", "data")])
+def assign_n_it(n_it, mem_tdvm):
+    data_n_it["value"] = n_it
+    data_n_it["state"] = "success"
+    return data
+
+@app.callback(Output("value.sim_sec","data"),
+             [Input("sec-value","value")],
+             [State("value.sim_sec", "data")])
+def assign_sim_sec(sim_sec, data_sim_sec):
+    data_sim_sec["value"] = sim_sec
+    data_sim_sec["state"] = "success"
+    return data
+
+
+
+from itertools import zip_longest
+
+for name in ["wf", "pot"]:
+    @app.callback(
+        [Output("config", "data")],
+        [Input(f"{name}-config-vars","value")],
+        [State("config", "data"), State(f"vars.{name}.{name_eq}") for name_eq in eq_names[name]]
+    )
+    def assign_eq_val(expr, data_config, *datas):
+        value_vars = parse_nested_expr(expr)
+        name_vars = [[var.name for var in data["value"]] for data in datas]
+        var_names, _ = get_vars(mem_vars, eq_name)
+        sentinel = object()
+        for [values, names] in zip_longest([value_vars, name_vars], fillvalue=sentinel):
+            if sentinel not in [values, names]:
+                for pair in zip_longest([values, names], fillvalue=sentinel):
+                    if sentinel in pair:
+                        data_config["value"] = None
+                        data_config["state"] = "failed"
+                        return data_config
+            else:
+                data_config["value"] = None
+                data_config["state"] = "failed"
+                return data_config
+
+        data_config["value"] = value_vars
+        data_config["state"] = "success"
+
+        return data_config
+controls_tdvm = dbc.Card(
     [
+        dcc.Store(id="data.Dh", data={"value":None,"status":"failed"}),
+        dcc.Store(id="data.Dt", data={"value":None,"status":"failed"}),
+        dcc.Store(id="data.n_it", data={"value":None,"status":"failed"}),
+        dcc.Store(id="data.sim_sec", data={"value":None,"status":"failed"}),
         dbc.FormGroup(
             [
-                dbc.Label("Dh"),
-                dcc.Input(id="Dh-value", type="number", value=1/2)
+                render_latex(expression=r"Dh"),
+                dbc.Input(id="Dh-value", type="number", value=1/2)
             ]
         ),
         dbc.FormGroup(
             [
                 render_latex(expression=r"\Delta t"),
-                dcc.Input(id="Dt-value", type="number", value=0.01),
+                dbc.Input(id="Dt-value", type="number", value=0.01),
+            ]
+        ),
         dbc.FormGroup(
             [
                 dbc.Label("Wave-Function Configuration"),
@@ -342,12 +425,10 @@ controls_tdmb = dbc.Card(
         dbc.FormGroup(
             [
                 dbc.Label("Potential Configuration"),
-                html.Div(id="pot-config"),
                 dash_katex.DashKatex(expression="",
                     displayMode=True,
                     throwOnError=False,
                     id="pot-config-vars"
-                )
                 ),
                 dbc.Input(id="pot-config-vars-value", type="text"),
             ]
@@ -361,6 +442,19 @@ controls_tdmb = dbc.Card(
                     id="other-config-vars"
                 ),
                 dbc.Input(id="other-config-vars-value", type="text"),
+            ]
+        ),
+        dbc.FormGroup(
+            [
+                dbc.Label("Number of iterations for Metropolis algorithm (higher leads to more accurate results)"),
+                dbc.Input(id="it-value", type="number", value=1000),
+            ]
+        ),
+        dbc.FormGroup(
+            [
+                dbc.Label("Seconds of simulation"),
+                html.Div(id="other-config"),
+                dbc.Input(id="sec-value", type="number", value=1.0),
             ]
         ),
 
@@ -426,6 +520,7 @@ app.layout =  dbc.Container(
             ),
             html.Hr(),
             html.H2("Time Dependend Variational Montecarlo"),
+            controls_tdvm,
 
         ]
     ),
