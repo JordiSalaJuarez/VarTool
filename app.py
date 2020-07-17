@@ -316,7 +316,74 @@ card_operators = dbc.Card(
     ]
 )
 
-controls_tdmb = dbc.Card(
+@app.callback(
+    [Output("interval-sim","disabled"),Output("compiled", "data"),Output("compiled", "data")]
+    [Input("run-sim", "n_clicks")],
+    [State("compiled", "data"), State("config","data")]
+
+)
+def tdvm_run(n, data_compiled, data_config):
+    return True, 
+    var_exprs_wf, var_names_wf  = get_vars(mem_vars, ["wf"])
+    var_exprs_pot, var_names_pot  = get_vars(mem_vars, ["pot"])
+
+    vars_wf = mem_vars["wf"]
+    vars_pot = mem_vars["pot"]
+    try:
+        wf_config = {{var_name: var for var_name, var in zip(var_names, vars)} 
+                     for var_names, vars in  zip(var_names_wf, vars_wf)}
+        pot_config = {{var_name: var for var_name, var in zip(var_names, vars)} 
+                      for var_names, vars in  zip(var_names_pot, vars_pot)}
+    except:
+        return data
+        raise PreventUpdate("Missmatched configuration values for wave-function or potential variables")
+
+    if not is_running:
+        mem_tdvm["is_running"] = True
+        mem_tdvm["curr_time"] = 0.0
+        data["El"], data["El_Op_dc_iter"], data["Ev_Matesq_Vdret"] = compute_funcs(config)
+    return data
+
+
+
+@app.callback(
+    [Output("mem-tdvm", "data"), Output("simulation-progres", "value"), Output("simulation-progres", "color")],
+    [Input("10-interval", "n_times")],
+    [State("mem-tdvm", "data")]
+)
+def tdvm_iteration(mem_tdvm):
+    if not mem_tdvm.get("is_running", False): raise PreventUpdate
+
+    wf_config = mem_tdvm["config wf"]
+    pot_config = mem_tdvm["config pot"]
+    mem_tdvm["t"] = mem_tdvm.get("t", [])
+    mem_tdvm["c"] =  mem_tdvm.get("c", [])
+    curr_time = mem_tdvm["curr_time"]
+    delta = mem_tdvm["Dt"]
+    config = {"Dh": data_vars["Dh"], 
+              "Dt": data_vars["Dt"],
+              "n_it": data_vars["n_it"],
+              "p": tuple(tuple(value for value in eq_config.values()) 
+                         for eq_config in wf_config.values()),
+              "c": tuple(tuple(value for value in eq_config.values()) 
+                         for eq_config in pot_config.values())}
+    mem_tdvm["t"].append(curr_time)
+
+
+    ev,Matesq, Vdret= Ev_Matesq_Vdret(**config)
+    cdot = numpy.linalg.pinv(Matesq) @ Vdret
+    c0s, cis, cijs = c
+    c_arr = np.array([*c0s, *cis, *cijs])
+    c_arr -= cdot * delta
+    c_arr = np.clip(c_arr, a_min = [0.0]*len(c_arr), a_max=[10e+10]*len(c_arr))
+    splits = np.cumsum(list(map(len,c[:-1])))
+    c = tuple(list(np.split(c_arr, splits)))
+    curr_time += delta
+    mem_tdvm["curr_time"] = curr_time
+    mem_tdvm["curr_time"].append(c)
+    if curr_time == mem_tdvm["sim_sec"]: return  mem_tdvm, 100, "success"
+    else: return mem_tdvm, int(curr_time / data["sim_sec"] * 100), "primary"
+
 from functools import lru_cache
 
 @lru_cache
