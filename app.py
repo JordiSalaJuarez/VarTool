@@ -393,6 +393,23 @@ for name in ["wf", "pot"]:
         data_config["state"] = "success"
 
         return data_config
+
+@app.callback([Output("start-sim", "disabled"),Output("spinner-sim","children")]
+              [Input("value.Dt", "data"), Input("value.Dh", "data"), Input("value.n_it", "data"), Input("value.sim_sec", "data"),
+               Input("run-sim", "n_clicks")])
+def disable_button_start_sim(*data_values):
+    all_defined = all(data["state"] == "success" for data in data_values)
+    ctx = dash.callback_context
+    is_clicked = any(comp["prop_id"] == "run-sim.n_clicks" for comp in ctx.triggered)
+    return not all_defined or is_clicked, not is_clicked 
+
+
+
+
+
+
+
+
 controls_tdvm = dbc.Card(
     [
         dcc.Store(id="data.Dh", data={"value":None,"status":"failed"}),
@@ -457,6 +474,7 @@ controls_tdvm = dbc.Card(
                 dbc.Input(id="sec-value", type="number", value=1.0),
             ]
         ),
+        dbc.Button("Run simulation", color="primary", id="run-sim",block=True),
 
     ],
     body=True,
