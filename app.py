@@ -173,9 +173,10 @@ render_latex = partial(dash_katex.DashKatex, displayMode=False, throwOnError=Fal
 
 var_ids = {
     "utils": {"r_i": "r_i-var", "r_ij": "r_ij-var", "r_cm": "r_cm-var"} ,
-    "wave-function": {"f0": "f0-var", "f1": "f1-var", "f2": "f2-var"}, 
-    "potential": {"vi": "vi-var", "vij": "vij-var"},
-    "operators": {"op0": "op0-var", "op1": "op1-var" , "op2": "op2-var"}
+    "wf": {"f0": "f0-var", "f1": "f1-var", "f2": "f2-var"}, 
+    "pot": {"vi": "vi-var", "vij": "vij-var"},
+    "op": {"op0": "op0-var", "op1": "op1-var" , "op2": "op2-var"}
+}
 }
 
 
