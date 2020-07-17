@@ -249,21 +249,6 @@ card_operators = dbc.Card(
                 html.Div(render_latex(expression=r"\; \mathcal{O}_0,\;"),style={'display': 'inline-block'}),
                 html.Div(render_latex(expression=r"\; \mathcal{O}_1,\;"),style={'display': 'inline-block'}),
                 html.Div(render_latex(expression=r"\; \mathcal{O}_2,\;"),style={'display': 'inline-block'}),
-                # html.Div(
-                #     [
-                #         dbc.Row(
-                #             [
-                #                 dbc.Col(generate_input_equation(app=app, eq_expr=r"\mathcal{O}_0", id_eq="op0", id_var=var_ids["operators"]["op0"]), width="auto"),
-                #                 dbc.Col(generate_input_equation(app=app, eq_expr=r"\mathcal{O}_1(i)", id_eq="op1", id_var=var_ids["operators"]["op1"]), width="auto"),
-                #                 dbc.Col(generate_input_equation(app=app, eq_expr=r"\mathcal{O}_2(i,j)", id_eq="op2", id_var=var_ids["operators"]["op2"]), width="auto"),
-                #                 dbc.Col(html.Div("One of three columns")),
-                #                 dbc.Col(html.Div("One of three columns")),
-                #                 dbc.Col(html.Div("One of three columns")),
-                #             ],
-                #             justify="center"
-                #         )
-                #     ]
-                # ),
                 dbc.CardDeck(
                     [                       
                         generate_input_equation(app=app, eq_expr=r"\mathcal{O}_0", id_eq="op0", id_var=var_ids["op"]["op0"], addr_mem_vars=("op", "op0")),
