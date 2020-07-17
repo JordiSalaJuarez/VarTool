@@ -1,7 +1,7 @@
 import dash
 import dash_bootstrap_components as dbc
 import dash_core_components as dcc
-from dash.dependencies import Input, Output
+from dash.dependencies import Input, Output, State
 import dash_html_components as html
 import plotly.graph_objs as go
 import dash_katex
@@ -9,6 +9,7 @@ from functools import partial
 from collections import defaultdict
 from sympy import latex
 import tdvmc.mathematica_to_sympy as m2s
+from dash.exceptions import PreventUpdate
 
 # app = dash.Dash(external_stylesheets=[dbc.themes.BOOTSTRAP])
 app = dash.Dash(__name__,external_stylesheets=[dbc.themes.BOOTSTRAP])
@@ -23,40 +24,94 @@ def generate_input_equation(app,
                             eq_expr, 
                             id_eq,
                             id_var,
+                            addr_mem_vars,
                             placeholder_eq="write your equation", 
                             placeholder_var="put variables comma separated"):
-
-    @app.callback(
-        [Output(id_var, "valid"), Output(id_var, "invalid"), Output(f"{id_var}-list", "expression")],
-        [Input(id_var, "value")]
-    )
-    def display_vars(text):
-        if not text: return False, False,""
-        try:
-            render_latex = partial(dash_katex.DashKatex, displayMode=False, throwOnError=False)
-            expressions = list(filter(lambda x: x, text.replace(" ","").split(",")))
-            config[id_var] = [m2s.parse(expr) for expr in expressions]
-
-            return True, False,  str(r"\{"+ ", ".join(latex(var) for var in config[id_var]) + r"\}")
-        except Exception as e:
-            return False, True, ""
-
-    @app.callback(
-        [Output(id_eq, "valid"), Output(id_eq, "invalid"), Output(f"{id_eq}-latex", "expression") , Output(f"{id_eq}-popover", "is_open"), Output(f"{id_eq}-popover-body", "children")],
-        [Input(id_eq, "value")]
-    )
-    def check_equation(text):
-        if not text: return False, False,"", False, ""
-        else:
-            try:
-                print(config.get(id_var, {}))
-                config[id_eq] = m2s.parse(text, vars={var.name: var for var in config.get(id_var, [])})
-                return True, False,str(latex(config[id_eq])), False, ""
-            except Exception as e:
-                return False, True,"", True, str(e)
+    id_store_vars =  ".".join(["vars", *addr_mem_vars])
+    id_store_eq = ".".join(["eq", *addr_mem_vars])
     render_latex = partial(dash_katex.DashKatex, displayMode=False, throwOnError=False)
+
+    @app.callback(
+        [Output(id_store_eq, 'data')],
+        [Input(id_eq, "value")],
+        [State(id_store_vars, "data")]
+    )
+    def store_eq(expr, data_eq ,data_vars):
+        try:
+            data_eq["value"] = m2s.parse(text, vars={var.name: var for var in data_vars["value"]})
+            data_eq["state"] = "success"
+            return data_eq
+        except Exception as e:
+            data_eq["value"] = None
+            data_eq["state"] = "failed"
+            data_eq["msg"] = str(e) 
+            return data_eq
+
+    @app.callback(
+        [Output(id_store_vars,"data")],
+        [Input(id_vars, "value")],
+        [State(id_store_vars,"data")]
+    )
+    def store_vars(expr, data_vars):
+        try:
+            variables = parse_nested_expr(expr)
+            name, subname, *_ = mem_var
+            data_vars["value"] = [m2s.parse(var) for var in variables]
+            data_vars["state"] = "success"
+            return data_vars
+        except Exception as e:
+            data_vars["value"] = None
+            data_vars["state"] = "failed"
+            return data_vars
+
+    @app.callback(
+        [Output(id_var, "valid"), Output(id_var, "invalid")],
+        [Input(id_store_vars,"data")],
+    )
+    def check_valid_vars(data_vars):
+        is_valid = data_vars["state"] == "success"
+        return is_valid, not is_valid
+
+    @app.callback(
+        [Output(f"{id_var}-list", "expression")],
+        [Input(id_store_vars,"data")],
+    )
+    def show_vars(data_vars):
+        if data_vars["state"] == "failed": raise PreventUpdate
+        else: 
+            variables = data_vars["value"]
+            return  r"\{"+ ", ".join(latex(var) for var in variables) + r"\}"
+
+    @app.callback(
+        [Output(id_eq, "valid"), Output(id_eq, "invalid")],
+        [Input(id_store_eq,"data")],
+    )
+    def check_valid_vars(data_eq):
+        is_valid = data_eq["state"] == "success"
+        return is_valid, not is_valid
+
+    @app.callback(
+        [Output(f"{id_eq}-latex", "expression")],
+        [Input(id_store_eq,"data")],
+    )
+    def show_eq(data_eq):
+        if data_eq["state"] == "failed": raise PreventUpdate
+        else: return data_eq["value"]
+            return latex(data_vars["value"])
+
+    @app.callback(
+        [Output(f"{id_eq}-popover", "is_open"), Output(f"{id_eq}-popover-body", "children")],
+        [Input(id_store_eq,"data")]
+    )
+    def show_error_eq(data_eq):
+        msg = data_eq.get("msg", "")
+        has_failed = data_eq["state"] == "failed"
+        return has_failed, msg
+    
     return dbc.Card(
         [
+            dcc.Store(id=id_store_eq, data={"value":None,"status":"failed"}),
+            dcc.Store(id=id_store_vars, data={"value":[],"status":"success"}),
             dbc.CardBody(
                 [
                     dbc.FormGroup(
@@ -95,14 +150,14 @@ def generate_input_equation(app,
                 [
                     dbc.FormGroup(
                         [
-                            html.H5("Variables", className=f"{id_var}-test"),
+                            html.H5("Variables", className=f"{id_vars}-test"),
                             dbc.Input(
-                                type="text", id=id_var, placeholder=placeholder_var
+                                type="text", id=id_vars, placeholder=placeholder_var
                             ),
                             html.Br()
                             ,
                             dbc.Container(render_latex(expression="",
-                                id=f"{id_var}-list",
+                                id=f"{id_vars}-list",
                             ))
                         ],
                         style={'width': "auto"}
@@ -133,9 +188,9 @@ card_utils = dbc.Card(
                 html.Div(html.P("Define helper functions"),style={'display': 'inline-block'}),
                 dbc.CardDeck(
                     [                       
-                        generate_input_equation(app=app, eq_expr=r"r_i", id_eq="r_i", id_var=var_ids["utils"]["r_i"]),
-                        generate_input_equation(app=app, eq_expr=r"r_{ij}", id_eq="r_ij", id_var=var_ids["utils"]["r_ij"]),
-                        generate_input_equation(app=app, eq_expr=r"r_\text{cm}", id_eq="r_cm", id_var=var_ids["utils"]["r_cm"]),
+                        generate_input_equation(app=app, eq_expr=r"r_i", id_eq="r_i", id_var=var_ids["utils"]["r_i"], addr_mem_vars=("utils", "r_i") ),
+                        generate_input_equation(app=app, eq_expr=r"r_{ij}", id_eq="r_ij", id_var=var_ids["utils"]["r_ij"], addr_mem_vars=("utils", "r_ij")),
+                        generate_input_equation(app=app, eq_expr=r"r_\text{cm}", id_eq="r_cm", id_var=var_ids["utils"]["r_cm"], addr_mem_vars=("utils", "r_cm")),
                     ]
                 ),
             ]
@@ -152,9 +207,9 @@ card_wave_function = dbc.Card(
                 html.P("Define the wave funtion Jastrow terms"),
                 dbc.CardDeck(
                     [                       
-                        generate_input_equation(app=app, eq_expr=r"f_0", id_eq="f0", id_var=var_ids["wave-function"]["f0"]),
-                        generate_input_equation(app=app, eq_expr=r"f_1(i)", id_eq="f1", id_var=var_ids["wave-function"]["f1"]),
-                        generate_input_equation(app=app, eq_expr=r"f_2(i,j)", id_eq="f2", id_var=var_ids["wave-function"]["f2"])
+                        generate_input_equation(app=app, eq_expr=r"f_0", id_eq="f0", id_var=var_ids["wf"]["f0"], addr_mem_vars=("wf", "f0")),
+                        generate_input_equation(app=app, eq_expr=r"f_1(i)", id_eq="f1", id_var=var_ids["wf"]["f1"], addr_mem_vars=("wf", "f1")),
+                        generate_input_equation(app=app, eq_expr=r"f_2(i,j)", id_eq="f2", id_var=var_ids["wf"]["f2"], addr_mem_vars=("wf", "f2"))
                     ]
                 ),
             ]
@@ -175,8 +230,8 @@ card_potential = dbc.Card(
                 html.Div(render_latex(expression=r"v_{ij}"),style={'display': 'inline-block'}),
                 dbc.CardDeck(
                     [                       
-                        generate_input_equation(app=app, eq_expr=r"v_i", id_eq="vi", id_var=var_ids["potential"]["vi"]),
-                        generate_input_equation(app=app, eq_expr=r"v_{ij}", id_eq="vij", id_var=var_ids["potential"]["vij"]),
+                        generate_input_equation(app=app, eq_expr=r"v_i", id_eq="vi", id_var=var_ids["pot"]["vi"], addr_mem_vars=("pot", "vi")),
+                        generate_input_equation(app=app, eq_expr=r"v_{ij}", id_eq="vij", id_var=var_ids["pot"]["vij"], addr_mem_vars=("pot", "vij")),
                     ]
                 ),
             ]
@@ -211,9 +266,9 @@ card_operators = dbc.Card(
                 # ),
                 dbc.CardDeck(
                     [                       
-                        generate_input_equation(app=app, eq_expr=r"\mathcal{O}_0", id_eq="op0", id_var=var_ids["operators"]["op0"]),
-                        generate_input_equation(app=app, eq_expr=r"\mathcal{O}_1(i)", id_eq="op1", id_var=var_ids["operators"]["op1"]),
-                        generate_input_equation(app=app, eq_expr=r"\mathcal{O}_2(i,j)", id_eq="op2", id_var=var_ids["operators"]["op2"]),
+                        generate_input_equation(app=app, eq_expr=r"\mathcal{O}_0", id_eq="op0", id_var=var_ids["op"]["op0"], addr_mem_vars=("op", "op0")),
+                        generate_input_equation(app=app, eq_expr=r"\mathcal{O}_1(i)", id_eq="op1", id_var=var_ids["op"]["op1"], addr_mem_vars=("op", "op1")),
+                        generate_input_equation(app=app, eq_expr=r"\mathcal{O}_2(i,j)", id_eq="op2", id_var=var_ids["op"]["op2"], addr_mem_vars=("op", "op2")),
                     ]
                 ),
             ]
@@ -272,6 +327,8 @@ config_tdvm = {"fails": False}
 app.layout =  dbc.Container(
     html.Div(
         [
+            dcc.Store(id="mem-eqs"),
+            dcc.Store(id="mem-vars"),
             html.H2("Variational Montecarlo Equations"),
             dbc.Card(
                 [
