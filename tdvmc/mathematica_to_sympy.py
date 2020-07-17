@@ -45,6 +45,30 @@ calc_grammar = """
     ?call: "Sqrt" "[" expr "]" -> sqrt
          | "Log" "[" expr "]" -> ln
          | "Log" "[" expr "," expr "]" -> log
+         | "Sin" "[" expr "]" -> sin
+         | "Cos" "[" expr "]" -> cos
+         | "Tan" "[" expr "]" -> tan
+         | "Cot" "[" expr "]" -> cot
+         | "Sec" "[" expr "]" -> sec
+         | "Csc" "[" expr "]" -> csc
+         | "ArcSin" "[" expr "]" -> asin
+         | "ArcCos" "[" expr "]" -> acos
+         | "ArcTan" "[" expr "]" -> atan
+         | "ArcCot" "[" expr "]" -> acot
+         | "ArcSec" "[" expr "]" -> asec
+         | "ArcCsc" "[" expr "]" -> acsc
+         | "Sinh" "[" expr "]" -> sinh
+         | "Cosh" "[" expr "]" -> cosh
+         | "Tanh" "[" expr "]" -> tanh
+         | "Coth" "[" expr "]" -> coth
+         | "Sech" "[" expr "]" -> sech
+         | "Csch" "[" expr "]" -> csch
+         | "ArcSinh" "[" expr "]" -> asinh
+         | "ArcCosh" "[" expr "]" -> acosh
+         | "ArcTanh" "[" expr "]" -> atanh
+         | "ArcCoth" "[" expr "]" -> acoth
+         | "ArcSech" "[" expr "]" -> asech
+         | "ArcCsch" "[" expr "]" -> acsch
          | "Sum" "[" expr ("," expr )*  "]" -> sum
          | "Product" "[" expr ("," expr )*  "]" -> product
          | "Power" "[" expr "," expr "]" -> power
@@ -58,7 +82,7 @@ calc_grammar = """
     ?list: "{" ((expr ",")* expr)? "}" -> tuple
 
     ?symbol: "E" -> e
-           | "\\[" NAME "]" -> symbol
+           | "\\[" NAME "]" -> symbol_lower
            | NAME       -> symbol
 
     ?indexed_symbol: NAME "[" (expr ",")* expr "]" -> indexed_symbol
@@ -75,9 +99,12 @@ simp_types = {"Simplify": simplify, "Factor": factor, "Cancel": cancel, "Expand"
 @v_args(inline=True)    # Affects the signatures of the methods
 class CalculateTree(Transformer):
     from operator import neg
-    from sympy.abc import alpha as _alpha , beta as _beta , gamma as _gamma
+    from sympy import sin, cos, tan, cot, sec, csc, sinc
+    from sympy import asin, acos, atan, acot, asec, acsc, atan2
+    from sympy import sinh, cosh, tanh, coth, sech, csch
+    from sympy import asinh, acosh, atanh, acoth, asech, acsch
+
     from sympy import Symbol, Number as number, Tuple as tuple, Mul as times, Add as plus, Pow as power, E, Lambda as function
-    e, alpha , beta, gamma = (lambda self,var=var: var for var in [E, _alpha, _beta, _gamma])
     def assig(self, var, expr): self.vars[var] = expr
     def indexed_symbol(self, var, *args):
         if var in self.vars:
@@ -88,9 +115,13 @@ class CalculateTree(Transformer):
     product = lambda self, f, *args : Product(f, *args)
     divide = lambda self, x, y: Mul(x, Pow(y, -1))
     substract = lambda self, x, y: Add(x, Mul(-1, y))
-    symbol = lambda self, var: self.vars.get(var, Symbol(var, real=True))
-    
+    symbol = lambda self, var: self.vars.get(var,  Symbol(var, real=True))
+    symbol_lower = lambda self, var: self.vars.get(var.lower(),  Symbol(var.lower(), real=True))
     def sqrt(self, expr): return sympy.sqrt(expr)
+    def sin(self, expr): return sympy.sin(expr)
+    def cos(self, expr): return sympy.cos(expr)
+    def tan(self, expr): return sympy.tan(expr)
+
     def ln(self, expr): return sympy.ln(expr)
     def log(self, expr, base): return sympy.log(expr, base)
     
