@@ -177,8 +177,61 @@ var_ids = {
     "pot": {"vi": "vi-var", "vij": "vij-var"},
     "op": {"op0": "op0-var", "op1": "op1-var" , "op2": "op2-var"}
 }
+eq_names = {
+    "wf": ["f0", "f1", "f2"],
+    "pot": ["vi", "vij"],
+    "op": ["op0", "op1", "op2"],
+    "supp": ["ri", "rij", "rcm"]
 }
 
+def brackets(expr):
+    return r"\{" + expr + r"\}"
+
+
+
+for name in ["wf", "pot"]:
+    @app.callback(
+        Output(f"{name}-config-vars", "expression"),
+        [Input(f"vars.{name}.{eq_name}", "data") eq_name in eq_names(name)]
+    )
+    def config_vars(*list_data_vars):
+        if any(data_vars["state"] == "failed" for data_vars in list_data_vars):
+            raise PreventUpdate
+        
+        # returns something like "{{a, b, c}, {d, e, f}}"
+        return brackets(
+            ",".join(
+                brackets(
+                    ",".join(
+                        latex(var) 
+                        for var in data_vars["value"])
+                    ) 
+                for data_vars in list_data_vars
+            )
+        )
+               
+
+
+
+
+other_equations = set(eq_names.keys()) - set(["pot","wf"])
+
+@app.callback(
+    Output("other-config-vars", "expression"),
+    [Input(f"vars.{name}.{eq_name}", "data") for name in other_equations for eq_name in eq_names(name)]
+)
+def other_config_vars(*list_data_vars):
+
+    return brackets(
+            ",".join(
+                brackets(
+                    ",".join(
+                        latex(var) 
+                        for var in data_vars["value"])
+                    ) 
+                for data_vars in list_data_vars
+            )
+        )
 
 
 card_utils = dbc.Card(
@@ -275,6 +328,15 @@ controls_tdmb = dbc.Card(
             [
                 render_latex(expression=r"\Delta t"),
                 dcc.Input(id="Dt-value", type="number", value=0.01),
+        dbc.FormGroup(
+            [
+                dbc.Label("Wave-Function Configuration"),
+                dash_katex.DashKatex(expression="",
+                    displayMode=True,
+                    throwOnError=False,
+                    id="wf-config-vars"
+                ),
+                dbc.Input(id="wf-config-vars-value", type="text"),
             ]
         ),
         dbc.FormGroup(
@@ -286,6 +348,19 @@ controls_tdmb = dbc.Card(
                     throwOnError=False,
                     id="pot-config-vars"
                 )
+                ),
+                dbc.Input(id="pot-config-vars-value", type="text"),
+            ]
+        ),
+        dbc.FormGroup(
+            [
+                dbc.Label("Other Vars Configuration"),
+                dash_katex.DashKatex(expression="",
+                    displayMode=True,
+                    throwOnError=False,
+                    id="other-config-vars"
+                ),
+                dbc.Input(id="other-config-vars-value", type="text"),
             ]
         ),
 
